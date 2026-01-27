@@ -1,0 +1,7 @@
+{:lint-as {promethean.tool/def-tool clojure.core/def
+           promethean.agent.dsl/def-agent clojure.core/def
+           promethean.agent.dsl/def-agent-proto clojure.core/def
+           promethean.modules.core/def-module clojure.core/def
+           promethean.router.core/def-router clojure.core/def
+           promethean.bench.dsl/def-benchmark clojure.core/def
+           promethean.bench.scenario-dsl/def-scenario clojure.core/def}}

@@ -1,0 +1,42 @@
+# Clojure
+target/
+classes/
+*.class
+*.jar
+*.war
+*.ear
+
+# Dependencies
+.cpcache/
+.nrepl-port/
+.pnp/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+*.out
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# REPL history
+.repl_history
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

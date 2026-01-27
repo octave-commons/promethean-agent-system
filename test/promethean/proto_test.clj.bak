@@ -1,0 +1,140 @@
+(ns promethean.proto-test
+  (:require [clojure.test :refer [deftest testing is are]]
+            [promethean.proto :as proto]))
+
+(deftest test-proto-registration
+  (testing "Proto registration and retrieval"
+    (let [proto-id :test.proto
+          proto-def {:description "Test proto"
+                     :proto/defaults {:test "value"}
+                     :proto/hooks {:before [(fn [ctx args] (assoc ctx :before true))]}}]
+      
+      ;; Register proto
+      (is (= proto-id (proto/register-proto! proto-id proto-def)))
+      
+      ;; Retrieve proto
+      (let [retrieved (proto/get-proto proto-id)]
+        (is (not (nil? retrieved)))
+        (is (= "Test proto" (:description retrieved))))
+      
+      ;; Clean up
+      (swap! proto/*protos dissoc proto-id))))
+
+(deftest test-def-proto-macro
+  (testing "def-proto macro functionality"
+    (let [proto-id :test.macro.proto]
+      
+      ;; Use def-proto macro
+      (proto/def-proto proto-id 
+        {:description "Macro test proto"
+         :proto/defaults {:macro "test"}})
+      
+      ;; Verify registration
+      (let [retrieved (proto/get-proto proto-id)]
+        (is (not (nil? retrieved)))
+        (is (= "Macro test proto" (:description retrieved)))
+        (is (= proto-id (:proto/id retrieved))))
+      
+      ;; Clean up
+      (swap! proto/*protos dissoc proto-id))))
+
+(deftest test-proto-materialization
+  (testing "Proto materialization with inheritance"
+    (let [parent-id :test.parent
+          child-id :test.child
+          mixin-id :test.mixin]
+      
+      ;; Register parent
+      (proto/register-proto! parent-id
+        {:description "Parent proto"
+         :proto/defaults {:parent "value"
+                          :shared "parent"}
+         :proto/hooks {:before [(fn [ctx args] (assoc ctx :parent true))]}})
+      
+      ;; Register mixin
+      (proto/register-proto! mixin-id
+        {:description "Mixin proto"
+         :proto/defaults {:mixin "value"
+                          :shared "mixin"}
+         :proto/hooks {:after [(fn [ctx args result] (assoc result :mixin true))]}})
+      
+      ;; Register child with inheritance and mixin
+      (proto/register-proto! child-id
+        {:description "Child proto"
+         :extends parent-id
+         :mixins [mixin-id]
+         :proto/defaults {:child "value"}})
+      
+      ;; Materialize child
+      (let [materialized (proto/materialize child-id)]
+        (is (= child-id (:proto/id materialized)))
+        
+        ;; Check merged defaults
+        (let [defaults (:proto/defaults materialized)]
+          (is (= "value" (:parent defaults)))
+          (is (= "value" (:mixin defaults)))
+          (is (= "value" (:child defaults)))
+          ;; Child should win for shared keys
+          (is (= "mixin" (:shared defaults))))
+        
+        ;; Check merged hooks
+        (let [hooks (:proto/hooks materialized)]
+          (is (= 1 (count (:before hooks))))
+          (is (= 1 (count (:after hooks))))))
+      
+      ;; Clean up
+      (swap! proto/*protos dissoc parent-id child-id mixin-id))))
+
+(deftest test-proto-cycle-detection
+  (testing "Cycle detection in proto inheritance"
+    (let [proto-a :test.cycle.a
+          proto-b :test.cycle.b]
+      
+      ;; Register protos with circular dependency
+      (proto/register-proto! proto-a {:extends proto-b})
+      (proto/register-proto! proto-b {:extends proto-a})
+      
+      ;; Should throw exception on materialization
+      (is (thrown-with-msg? 
+            clojure.lang.ExceptionInfo 
+            #"Prototype cycle"
+            (proto/materialize proto-a)))
+      
+      ;; Clean up
+      (swap! proto/*protos dissoc proto-a proto-b))))
+
+(deftest test-hook-execution
+  (testing "Hook execution functions"
+    (let [before-fn (fn [ctx args] (assoc ctx :before-count (inc (:before-count ctx 0))))
+          after-fn (fn [ctx args result] (assoc result :after-count (inc (:after-count result 0))))
+          around-fn (fn [base-fn] (fn [ctx args] (assoc (base-fn ctx args) :around true)))
+          ctx {:before-count 0}
+          args {}
+          result {:after-count 0}]
+      
+      ;; Test run-before
+      (let [befores [before-fn (fn [ctx args] (assoc ctx :before-count (inc (:before-count ctx 0))))]]
+        (let [outcome (proto/run-before befores ctx args)]
+          (is (= 2 (:before-count (:ctx outcome))))))
+      
+      ;; Test run-after  
+      (let [afters [after-fn (fn [ctx args result] (assoc result :after-count (inc (:after-count result 0))))]]
+        (let [final-result (proto/run-after afters ctx args result)]
+          (is (= 2 (:after-count final-result)))))
+      
+      ;; Test wrap-around
+      (let [base-fn (fn [ctx args] {:base true})
+            around-fns [around-fn]]
+        (let [wrapped (proto/wrap-around around-fns base-fn)]
+          (let [result (wrapped ctx args)]
+            (is (:base result))
+            (is (:around result)))))))))
+
+(deftest test-unknown-proto-handling
+  (testing "Handling of unknown protos"
+    (is (nil? (proto/get-proto :nonexistent.proto)))
+    
+    (is (thrown-with-msg?
+          clojure.lang.ExceptionInfo
+          #"Unknown proto"
+          (proto/materialize :nonexistent.proto)))))

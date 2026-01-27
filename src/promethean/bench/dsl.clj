@@ -1,0 +1,6 @@
+(ns promethean.bench.dsl)
+(defmacro calls [tool-name & [args]] `{:expect/type :calls :expect/tool ~tool-name :expect/args ~args})
+(defmacro abstains [] `{:expect/type :abstains})
+(defmacro case [id & {:as m}] `(merge {:case/id ~id} ~m))
+(defmacro suite [id & cases] `{:suite/id ~id :suite/cases ~(vec cases)})
+(defmacro def-benchmark [id & suites] `(def ~id {:bench/id ~(name id) :bench/suites ~(vec suites)}))
