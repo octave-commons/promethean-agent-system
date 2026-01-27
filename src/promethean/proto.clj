@@ -1,7 +1,7 @@
 (ns promethean.proto
   (:require [clojure.set :as set]))
 
-(defonce ^:dynamic *protos (atom {}))
+(defonce ^:private *protos (atom {}))
 
 (defn register-proto! [id m]
   (swap! *protos assoc id (assoc m :proto/id id))
