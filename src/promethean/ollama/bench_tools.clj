@@ -42,8 +42,9 @@
   (filter #(contains? (:tags %) tag) (tools)))
 
 (defn register-tool!
-  "Registers tool map by :name. Returns tool."
+   "Registers tool map by :name. Returns tool."
   [tool]
+  (println "[register-tool!] DEBUG: Registering tool" (:name tool) "- has impl?" (contains? tool :impl) "- impl type:" (type (:impl tool)))
   (when-not (string? (:name tool))
     (throw (ex-info "Tool :name must be a string" {:tool tool})))
   (swap! !tools assoc (:name tool) tool)
@@ -229,19 +230,26 @@
    Optional ctx is passed as the first argument when tool impl expects it."
   ([tool-name arguments]
    (invoke-tool! nil tool-name arguments))
-  ([ctx tool-name arguments]
-   (let [tool (tool-by-name tool-name)]
-     (if-not tool
+   ([ctx tool-name arguments]
+    (let [tool (tool-by-name tool-name)]
+      (println "[invoke-tool!] DEBUG: Looking up tool" tool-name "- found?" (boolean tool))
+      (when tool
+        (println "[invoke-tool!] DEBUG: Tool keys:" (keys tool) "- has impl?" (boolean (:impl tool)) "- impl:" (:impl tool)))
+      (if-not tool
        {:ok false :error :unknown-tool :details {:name tool-name}}
        (try
-         (let [f (:impl tool)
-               args (coerce-arguments arguments)
-               v (if ctx
-                   (try
-                     (f ctx args)
-                     (catch clojure.lang.ArityException _
-                       (f args)))
-                   (f args))]
+          (let [f (:impl tool)
+                 args (coerce-arguments arguments)
+                 _ (println "[invoke-tool!] DEBUG: About to call impl - f:" f "- ctx:" ctx "- args:" args)
+                 v (if ctx
+                     (try
+                       (f ctx args)
+                       (catch clojure.lang.ArityException _
+                         (f args)))
+                     (try
+                       (f args)
+                       (catch clojure.lang.ArityException _
+                         (f ctx args))))]
            {:ok true :value v})
          (catch Throwable t
             {:ok false :error :tool-exception

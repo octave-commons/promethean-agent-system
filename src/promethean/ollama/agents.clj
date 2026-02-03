@@ -149,21 +149,21 @@
            :raw_last_response resp
            :stopped_reason (if (empty? tool-calls) :no_tool_calls :max_steps)}
 
-          ;; Execute tools
-          (let [tool-results
-                (mapv (fn [{:keys [id name arguments]}]
-                        (let [valid (tools/validate-tool-call {:name name :arguments arguments})
-                              invoked (when (:ok valid)
-                                        (tools/invoke-tool! ctx name (:arguments valid)))
-                              payload (if (and invoked (:ok invoked))
-                                        (:value invoked)
-                                        invoked)]
-                          (assoc (select-keys valid [:ok :arguments])
-                                 :name name
-                                 :tool_call_id id
-                                 :invoked invoked
-                                 :content (stringify payload))))
-                      tool-calls)]
+    ;; Execute tools
+            (let [tool-results
+                  (mapv (fn [{:keys [id name arguments]}]
+                          (let [valid (tools/validate-tool-call {:name name :arguments arguments})
+                                invoked (when (:ok valid)
+                                              (tools/invoke-tool! ctx name (:arguments valid)))
+                                payload (if (and invoked (:ok invoked))
+                                          (:value invoked)
+                                          invoked)]
+                            (assoc (select-keys valid [:ok :arguments])
+                                   :name name
+                                   :tool_call_id id
+                                   :invoked invoked
+                                   :content (stringify payload))))
+                        tool-calls)]
 
             ;; Add tool result messages
             (let [tool-messages (mapv tool-result-message tool-results)
@@ -202,37 +202,34 @@
 ;; def-agent macro (simplified for now)
 (defmacro def-agent
   "Define + register an agent.
-
-  Directives:
-    (model "qwen3")
-    (instructions "...")
-    (tools mul add)
-    (options {:temperature 0})
-    (think true)
-    (max-steps 4)
-    (timeout-ms 300000)
-
-  Returns var bound to agent map."
+  
+   Directives:
+     (model \"qwen3\")
+     (instructions \"...\")
+     (tools add ...)
+     (options {:temperature 0})
+     (think true)
+     (max-steps 4)
+     (timeout-ms 300000)
+  
+   Returns var bound to agent map."
   [agent-name & body]
   (let [nm (name agent-name)
-        model (or (some #(and (seq? %) (= (first %) 'model) %) body) "gpt-3")
-        instructions (or (some #(and (seq? %) (= (first %) 'instructions) %) body) "")
-        tools-form (some #(and (seq? %) (= (first %) 'tools) %) body)
-        tools-names (when tools-form (vec (rest tools-form)))
-        think (or (some #(and (seq? %) (= (first %) 'think) %) body) false)
-        options (or (some #(and (seq? %) (= (first %) 'options) %) body) {})
-        max-steps (or (some #(and (seq? %) (= (first %) 'max-steps) %) body) 4)
-        timeout-ms (or (some #(and (seq? %) (= (first %) 'timeout-ms) %) body) 300000)]
-
-    `(def ~agent-name
+        model (or (second (first (filter #(and (seq? %) (= (first %) 'model) %) body))) "gpt-3")
+        instructions (or (second (first (filter #(and (seq? %) (= (first %) 'instructions) %) body))) "")
+        tools-form (first (filter #(and (seq? %) (= (first %) 'tools)) body))
+        tools-names (when tools-form (rest tools-form))
+        think (or (second (first (filter #(and (seq? %) (= (first %) 'think) %) body))) false)
+        options (or (second (first (filter #(and (seq? %) (= (first %) 'options) %) body))) {})
+        max-steps (or (second (first (filter #(and (seq? %) (= (first %) 'max-steps) %) body))) 4)
+        timeout-ms (or (second (first (filter #(and (seq? %) (= (first %) 'timeout-ms) %) body))) 300000)]
+    `(def ~nm
        (register-agent!
-         (merge
-           {:name ~nm
-            :model ~model
-            :instructions ~instructions
-            :tools ~tools-names
-            :think ~think
-            :options ~options
-            :max-steps ~max-steps
-            :timeout-ms ~timeout-ms}
-           ~@body)))))
+          {:name ~nm
+           :model ~model
+           :instructions ~instructions
+           :tools '~tools-names
+           :think ~think
+           :options ~options
+           :max-steps ~max-steps
+           :timeout-ms ~timeout-ms}))))
