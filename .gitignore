@@ -40,6 +40,3 @@ Thumbs.db
 .env.development.local
 .env.test.local
 .env.production.local
-
-# Clj-kondo cache
-.clj-kondo/.cache/
